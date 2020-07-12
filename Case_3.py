@@ -13,27 +13,29 @@ label_placeholder = tf.placeholder(tf.float32, shape=[None,512,512,3], name="lab
 with tf.variable_scope("model_vars"):
     w1 = tf.get_variable("w1", [3,3,3,16], initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode='FAN_AVG', uniform=False), trainable=True)
     w2 = tf.get_variable("w2", [3,3,16,3],initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode='FAN_AVG', uniform=False), trainable=True)
-    # w3 = tf.get_variable("w3", [3,3,3,3],initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode='FAN_AVG', uniform=False), trainable=True)
+    w3 = tf.get_variable("w3", [3,3,3,3],initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode='FAN_AVG', uniform=False), trainable=True)
 
     b1 = tf.get_variable("b1", [16], initializer=tf.constant_initializer(0), trainable=True)
     b2 = tf.get_variable("b2", [3],  initializer=tf.constant_initializer(0), trainable=True)
-    # b3 = tf.get_variable("b3", [3],  initializer=tf.constant_initializer(0), trainable=True)
+    b3 = tf.get_variable("b3", [3],  initializer=tf.constant_initializer(0), trainable=True)
 
 ## Define model (& layers)
 def original_model():
     conv1   = tf.nn.conv2d(input_placeholder, w1, strides=[1,1,1,1], padding="SAME", name="Layer1_conv")
     conv1_b = tf.nn.bias_add(conv1, b1, name="Layer1_bias")
-    act_1   = tf.nn.relu(conv1_b, name="Layer1_act")
+    act_1   = tf.nn.leaky_relu(conv1_b, name="Layer1_act")
+    act_1   = tf.nn.leaky_relu(act_1, name="Layer1_act") #Adding extra node
 
     conv2   = tf.nn.conv2d(act_1, w2, strides=[1,1,1,1], padding="SAME", name="Layer2_conv")
     conv2_b = tf.nn.bias_add(conv2, b2, name="Layer2_bias")
-    act_2   = tf.nn.relu(conv2_b, name="output")
+    act_2   = tf.nn.leaky_relu(conv2_b, name="Layer2_act") #Change relu to leaky_relu
+    act_2   = tf.nn.leaky_relu(act_2, name="Layer2_act") #Adding extra node
 
-    '''Removing Layer 3'''
-    # conv3   = tf.nn.conv2d(act_1, w3, strides=[1,1,1,1], padding="SAME", name="Layer3_conv")
-    # output = tf.nn.bias_add(conv3, b3, name="output")
+    conv3   = tf.nn.conv2d(act_2, w3, strides=[1,1,1,1], padding="SAME", name="Layer3_conv")
+    output  = tf.nn.bias_add(conv3, b3, name="Layer3_bias")
 
-    return act_2
+    skip_connection = tf.add(input_placeholder, output, name="output") #Adding Skip connection
+    return skip_connection
 
 ## Dataset
 tr_input, tr_label = get_tr_dataset()
@@ -68,7 +70,7 @@ with tf.Session() as sess:
     end = timer()
     print("==> Time to train: {t} sec".format(t=end-start))
 
-    save_path = saver_full.save(sess, "checkpoint/model-Case_1-2")
+    save_path = saver_full.save(sess, "checkpoint/model-Case_3")
     print("Model saved in path: %s" % save_path)
 
     # out_img = sess.run(output_te, feed_dict={input_placeholder:te_input})
